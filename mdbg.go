@@ -18,7 +18,17 @@ type Result struct {
 	Result []ResultObj
 }
 
-func CallMdbg(word string) ResultObj {
+type Mdgb interface {
+	Get(word string) ResultObj
+}
+
+type MdgbWeb struct{}
+
+func NewMdgbWeb() *MdgbWeb {
+	return &MdgbWeb{}
+}
+
+func (m *MdgbWeb) Get(word string) ResultObj {
 	httpposturl := "https://zhres.herokuapp.com/api/vocab/match"
 
 	var jsonData = []byte(`{

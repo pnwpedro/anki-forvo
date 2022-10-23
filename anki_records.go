@@ -16,6 +16,10 @@ type AnkiRecord struct {
 	AudioLocation string `csv:"AudioLocation"`
 	Pronunciation string `csv:"Pronunciation"`
 	Example       string `csv:"Example"`
+	Declension    string `csv:"Declension"`
+	Conjugation   string `csv:"Conjugation"`
+	Gender        string `csv:"Gender"`
+	GenitiveSingular string `csv:"GenetiveSingular"`
 }
 
 func (ar *AnkiRecord) ToSlice() []string {
@@ -25,6 +29,10 @@ func (ar *AnkiRecord) ToSlice() []string {
 		ar.AudioLocation,
 		ar.Pronunciation,
 		ar.Example,
+		ar.Declension,
+		ar.Conjugation,
+		ar.Gender,
+		ar.GenitiveSingular,
 	}
 }
 

@@ -10,17 +10,26 @@ import (
 	"anki-forvo-plugin/forvo"
 )
 
-// word,translation,audio,pronunciation,example
+// word,translation,audio,pronunciation,example,declension,conjugation,gender,genetive singular
 
 func main() {
 
 	lang := "zh"
-	// lang := "jp"
-	// lang := "es"
+	// lang := "ja"
+	// lang := "es" //"es_es"
 	// lang := "grc"
+	// lang := "la"
+
+	secondPos :=
+		false
+	//true // for example when the front is "accusative masc singular of dives" or similar
 
 	in := ReadFromCsv(lang)
 	out := []*AnkiRecord{}
+
+	var mdgb Mdgb
+	// mdgb = NewMdgbWeb()
+	mdgb = NewMdgbLocal()
 
 	for _, c := range in {
 		word := strings.TrimSpace(c.Word)
@@ -28,26 +37,37 @@ func main() {
 		audioPath := c.AudioLocation
 		translation := c.Translation
 		pronunciation := c.Pronunciation
+		declension := c.Declension
+		conjugation := c.Conjugation
+		gender := c.Gender
+		genitiveSingular := c.GenitiveSingular
 
 		if audioPath == "" {
 			audioPath = get_audio(word, lang)
+		}
+		if audioPath == "" && secondPos {
+			audioPath = get_audio(translation, lang)
 		}
 
 		if lang == "zh" {
 			// skip dictionary for sentences (ie words with translations already)
 			if translation == "" {
-				dictionaryEntry := CallMdbg(c.Word)
+				dictionaryEntry := mdgb.Get(c.Word)
 				translation = strings.Join(dictionaryEntry.English[:], ", ")
 				pronunciation = strings.Join(dictionaryEntry.Reading[:], ", ")
 			}
 		}
 
 		outRecord := &AnkiRecord{
-			Word:          word,
-			Translation:   translation,
-			AudioLocation: audioPath,
-			Pronunciation: pronunciation,
-			Example:       example,
+			Word:             word,
+			Translation:      translation,
+			AudioLocation:    audioPath,
+			Pronunciation:    pronunciation,
+			Example:          example,
+			Declension:       declension,
+			Conjugation:      conjugation,
+			Gender:           gender,
+			GenitiveSingular: genitiveSingular,
 		}
 
 		out = append(out, outRecord)
@@ -83,11 +103,18 @@ func get_audio(word string, lang string) string {
 		println("Forvo err", forvoErr.Error())
 	}
 
+	// For words that include a gender + def article, try without
 	if filepath == "" && (lang == "es" || lang == "grc") {
 		word_without_article := strip_definite_article(word, lang)
 		if word != word_without_article {
 			filepath, forvoErr = download(word_without_article, lang)
 		}
+	}
+
+	// for latin verbs try the first part
+	if filepath == "" && lang == "la" && strings.Contains(word, ",") {
+		firstPart := strings.Split(word, ",")[0]
+		filepath, forvoErr = download(firstPart, lang)
 	}
 
 	var audioPath string
@@ -108,11 +135,13 @@ func download(word string, language string) (string, error) {
 
 	mp3, err := forvo.GetFirstPronunciation(word, language)
 	if err != nil {
+		fmt.Println("Error after get first pronunciation", word)
 		return "", err
 	}
 
 	out, err := os.Create(filepathPrefix + filepathSuffix)
 	if err != nil {
+		fmt.Println("Error after create file", word)
 		return "", err
 	}
 	defer out.Close()
@@ -120,6 +149,7 @@ func download(word string, language string) (string, error) {
 	// Write the body to file
 	_, err = io.Copy(out, bytes.NewReader(mp3))
 	if err != nil {
+		fmt.Println("Error after writing body to file", word)
 		return "", err
 	}
 
