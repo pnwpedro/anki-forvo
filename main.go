@@ -10,25 +10,26 @@ import (
 	"anki-forvo-plugin/forvo"
 )
 
-// word,translation,audio,pronunciation,example,declension,conjugation,gender,genetive singular
+// word,translation,audio,pronunciation,example,declension,conjugation,gender,genetive singular,forvolookup
 
 func main() {
 
-	lang := "zh"
+	// lang := "zh"
 	// lang := "ja"
 	// lang := "es" //"es_es"
 	// lang := "grc"
-	// lang := "la"
+	lang := "la"
+	// lang := "nl"
+	// lang := "fr"
 
 	secondPos :=
-		false
-	//true // for example when the front is "accusative masc singular of dives" or similar
+		// false
+	true // for example when the front is "accusative masc singular of dives" or similar
 
 	in := ReadFromCsv(lang)
 	out := []*AnkiRecord{}
 
 	var mdgb Mdgb
-	// mdgb = NewMdgbWeb()
 	mdgb = NewMdgbLocal()
 
 	for _, c := range in {
@@ -41,9 +42,14 @@ func main() {
 		conjugation := c.Conjugation
 		gender := c.Gender
 		genitiveSingular := c.GenitiveSingular
+		forvoSearchField := c.ForvoSearchField
 
 		if audioPath == "" {
-			audioPath = get_audio(word, lang)
+			var searchTerm = forvoSearchField
+			if searchTerm == "" {
+				searchTerm = word
+			}
+			audioPath = get_audio(searchTerm, lang)
 		}
 		if audioPath == "" && secondPos {
 			audioPath = get_audio(translation, lang)
@@ -52,9 +58,13 @@ func main() {
 		if lang == "zh" {
 			// skip dictionary for sentences (ie words with translations already)
 			if translation == "" {
-				dictionaryEntry := mdgb.Get(c.Word)
+				dictionaryEntry := mdgb.Get(word)
 				translation = strings.Join(dictionaryEntry.English[:], ", ")
 				pronunciation = strings.Join(dictionaryEntry.Reading[:], ", ")
+			}
+
+			if pronunciation == "" {
+				pronunciation = mdgb.GetPinyin(word)
 			}
 		}
 
@@ -68,6 +78,7 @@ func main() {
 			Conjugation:      conjugation,
 			Gender:           gender,
 			GenitiveSingular: genitiveSingular,
+			ForvoSearchField: forvoSearchField,
 		}
 
 		out = append(out, outRecord)
@@ -81,18 +92,30 @@ func main() {
 
 func strip_definite_article(word string, language string) string {
 	es_articles := []string{"el", "la", "los", "las"}
-	grc_articles := []string{"ὁ", "οἱ", "ἡ", "αἱ", "τό", "τά"}
+	grc_articles := []string{"ὁ", "οἱ", "ἡ", "αἱ", "τό", "τά", "oἱ", "τό"}
+	fr_articles := []string{"le", "la", "les", "des", "un", "une"}
+	nl_articles := []string{"de", "het"}
 
 	language_def_article_map := map[string][]string{
 		"es":  es_articles,
 		"grc": grc_articles,
+		"fr":  fr_articles,
+		"nl":  nl_articles,
 	}
 
 	for _, v := range language_def_article_map[language] {
+		start_index := len(v) + 1
 		if strings.HasPrefix(word, v+" ") {
-			start_index := len(v) + 1
-			return word[start_index:]
+			return strings.TrimSpace(word[start_index:])
 		}
+
+		suffix := ", " + v
+		// println("trying " + suffix + " as a suffix")
+
+		if strings.HasSuffix(word, suffix) {
+			return strings.TrimSpace(word[:len(word)-len(v)-2])
+		}
+		// println("didn't find any article to remove")
 	}
 	return word
 }
@@ -104,7 +127,7 @@ func get_audio(word string, lang string) string {
 	}
 
 	// For words that include a gender + def article, try without
-	if filepath == "" && (lang == "es" || lang == "grc") {
+	if filepath == "" && (lang == "es" || lang == "grc" || lang == "fr" || lang == "nl") {
 		word_without_article := strip_definite_article(word, lang)
 		if word != word_without_article {
 			filepath, forvoErr = download(word_without_article, lang)
@@ -152,7 +175,6 @@ func download(word string, language string) (string, error) {
 		fmt.Println("Error after writing body to file", word)
 		return "", err
 	}
-
 	// TODO return forvo link for ease of manual fixes
 
 	return filepathSuffix, nil

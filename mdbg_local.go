@@ -16,8 +16,14 @@ func (m *MdgbLocal) Get(word string) ResultObj {
 	r := ResultObj{}
 
 	entry := m.d.GetByHanzi(word)
-	r.English = entry.Meanings
-	r.Reading = []string{entry.Pinyin}
+	if (entry != nil) {
+		r.English = entry.Meanings
+		r.Reading = []string{entry.Pinyin}
+	}
 
 	return r
+}
+
+func (m *MdgbLocal) GetPinyin(phrase string) string {
+	return m.d.HanziToPinyin(phrase)
 }

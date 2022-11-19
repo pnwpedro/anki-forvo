@@ -20,6 +20,7 @@ type Result struct {
 
 type Mdgb interface {
 	Get(word string) ResultObj
+	GetPinyin(phrase string) string
 }
 
 type MdgbWeb struct{}
