@@ -17,14 +17,14 @@ func main() {
 	// lang := "zh"
 	// lang := "ja"
 	// lang := "es" //"es_es"
-	// lang := "grc"
-	lang := "la"
+	lang := "grc"
+	// lang := "la"
 	// lang := "nl"
 	// lang := "fr"
 
 	secondPos :=
-		// false
-	true // for example when the front is "accusative masc singular of dives" or similar
+		false
+	// true // for example when the front is "accusative masc singular of dives" or similar
 
 	in := ReadFromCsv(lang)
 	out := []*AnkiRecord{}
@@ -42,7 +42,7 @@ func main() {
 		conjugation := c.Conjugation
 		gender := c.Gender
 		genitiveSingular := c.GenitiveSingular
-		forvoSearchField := c.ForvoSearchField
+		forvoSearchField := strings.TrimSpace(c.ForvoSearchField)
 
 		if audioPath == "" {
 			var searchTerm = forvoSearchField
