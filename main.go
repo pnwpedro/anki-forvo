@@ -1,84 +1,116 @@
 package main
 
 import (
+	"anki-forvo-plugin/forvo"
 	"bytes"
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 
-	"anki-forvo-plugin/forvo"
+	"golang.org/x/exp/slices"
 )
 
-// word,translation,audio,pronunciation,example,declension,conjugation,gender,genetive singular,forvolookup
+//TODO instead of "greek and latin" say "declined languages" or similar
+
+// OLD FIELDS word,translation,audio,pronunciation,example,declension,conjugation,gender,genetive singular,forvolookup
+// NEW Greek and Latin Fields
+//Word,Meaning,PrepositionAudioLocation,Pronunciation,Example,Translations,Gender,Declension,GenetiveSingular,Conjugation,ForvoSearchField,Headword,Sentence
+// NEW Other Language fields
+//Word,Meaning,Preposition,AudioLocation,Pronunciation,Example,Translations,ForvoSearchField,Headword,Sentence
+
+var supportedLanguages = []string{"zh", "ja", "es", "grc", "la", "nl", "en", "fr"}
 
 func main() {
 
 	// lang := "zh"
-	// lang := "ja"
+	lang := "ja"
 	// lang := "es" //"es_es"
-	lang := "grc"
+	// lang := "grc"
 	// lang := "la"
 	// lang := "nl"
 	// lang := "fr"
 
-	secondPos :=
+	searchMeaningField :=
 		false
 	// true // for example when the front is "accusative masc singular of dives" or similar
+	// TODO rethink this with new template
 
 	in := ReadFromCsv(lang)
 	out := []*AnkiRecord{}
 
-	var mdgb Mdgb
-	mdgb = NewMdgbLocal()
+	var mdgb = NewMdgbLocal()
+	var lexicala Lexicala = NewLexicala()
+	var deepL DeepL = NewDeepL()
 
 	for _, c := range in {
 		word := strings.TrimSpace(c.Word)
-		example := c.Example
-		audioPath := c.AudioLocation
-		translation := c.Translation
+		meaning := strings.TrimSpace(c.Meaning)
+		article := strings.TrimSpace(c.Article)
+		audioLocation := c.AudioLocation
 		pronunciation := c.Pronunciation
-		declension := c.Declension
-		conjugation := c.Conjugation
+		example := strings.TrimSpace(c.Example)
+		translations := c.Translations
 		gender := c.Gender
+		declension := c.Declension
 		genitiveSingular := c.GenitiveSingular
+		conjugation := c.Conjugation
 		forvoSearchField := strings.TrimSpace(c.ForvoSearchField)
+		isHeadword, _ := strconv.ParseBool(c.Headword)
+		isSentence, _ := strconv.ParseBool(c.Sentence)
 
-		if audioPath == "" {
+		if audioLocation == "" {
 			var searchTerm = forvoSearchField
 			if searchTerm == "" {
 				searchTerm = word
 			}
-			audioPath = get_audio(searchTerm, lang)
+			audioLocation = get_audio(searchTerm, lang)
 		}
-		if audioPath == "" && secondPos {
-			audioPath = get_audio(translation, lang)
+		if audioLocation == "" && searchMeaningField {
+			audioLocation = get_audio(meaning, lang)
 		}
 
 		if lang == "zh" {
 			// skip dictionary for sentences (ie words with translations already)
-			if translation == "" {
+			if meaning == "" {
 				dictionaryEntry := mdgb.Get(word)
-				translation = strings.Join(dictionaryEntry.English[:], ", ")
+				meaning = strings.Join(dictionaryEntry.English[:], ", ")
 				pronunciation = strings.Join(dictionaryEntry.Reading[:], ", ")
 			}
 
 			if pronunciation == "" {
 				pronunciation = mdgb.GetPinyin(word)
 			}
+		} else if meaning == "" && isHeadword {
+			lexicalaEntry := lexicala.Get(word, lang)
+			fmt.Println(lexicalaEntry)
+			if len(lexicalaEntry.Senses) != 0 {
+				meaning = lexicalaEntry.Senses[0].Definition
+				translations = writeTranslationsToField(lexicalaEntry.Senses[0].Translations)
+			}
+		} else if meaning == "" && isSentence {
+			deepLTranslation := deepL.Get(word, lang)
+			if deepLTranslation.Text != "" {
+				meaning = deepLTranslation.Text
+			}
 		}
 
 		outRecord := &AnkiRecord{
 			Word:             word,
-			Translation:      translation,
-			AudioLocation:    audioPath,
+			Meaning:          meaning,
+			Article:          article,
+			AudioLocation:    audioLocation,
 			Pronunciation:    pronunciation,
 			Example:          example,
+			Translations:     translations,
 			Declension:       declension,
 			Conjugation:      conjugation,
 			Gender:           gender,
 			GenitiveSingular: genitiveSingular,
 			ForvoSearchField: forvoSearchField,
+			Headword:         strconv.FormatBool(isHeadword),
+			Sentence:         strconv.FormatBool(isSentence),
 		}
 
 		out = append(out, outRecord)
@@ -88,7 +120,18 @@ func main() {
 	WriteToCsv("fixtures/output_"+lang+".csv", out)
 }
 
-//TODO handle moveable ν https://en.wikipedia.org/wiki/Movable_nu
+func writeTranslationsToField(translations map[string]Translation) string {
+	out := ""
+	for k, v := range translations {
+		fmt.Printf("key[%s] value[%s]\n", k, v)
+		if slices.Contains(supportedLanguages, k) && translations[k].Text != "" {
+			out = out + k + ": " + translations[k].Text + "\n"
+		}
+	}
+	return out
+}
+
+//TODO (GRC) handle moveable ν https://en.wikipedia.org/wiki/Movable_nu
 
 func strip_definite_article(word string, language string) string {
 	es_articles := []string{"el", "la", "los", "las"}
@@ -115,7 +158,6 @@ func strip_definite_article(word string, language string) string {
 		if strings.HasSuffix(word, suffix) {
 			return strings.TrimSpace(word[:len(word)-len(v)-2])
 		}
-		// println("didn't find any article to remove")
 	}
 	return word
 }
@@ -175,7 +217,5 @@ func download(word string, language string) (string, error) {
 		fmt.Println("Error after writing body to file", word)
 		return "", err
 	}
-	// TODO return forvo link for ease of manual fixes
-
 	return filepathSuffix, nil
 }

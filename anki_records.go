@@ -12,29 +12,37 @@ import (
 
 type AnkiRecord struct {
 	Word             string `csv:"Word"`
-	Translation      string `csv:"Translation"`
+	Meaning          string `csv:"Meaning"`
+	Article          string `csv:"Article"`
 	AudioLocation    string `csv:"AudioLocation"`
 	Pronunciation    string `csv:"Pronunciation"`
 	Example          string `csv:"Example"`
-	Declension       string `csv:"Declension"`
-	Conjugation      string `csv:"Conjugation"`
+	Translations     string `csv:"Translations"`
 	Gender           string `csv:"Gender"`
+	Declension       string `csv:"Declension"`
 	GenitiveSingular string `csv:"GenetiveSingular"`
+	Conjugation      string `csv:"Conjugation"`
 	ForvoSearchField string `csv:"ForvoSearchField"`
+	Headword         string `csv:"Headword"`
+	Sentence         string `csv:"Sentence"`
 }
 
 func (ar *AnkiRecord) ToSlice() []string {
 	return []string{
 		ar.Word,
-		ar.Translation,
+		ar.Meaning,
+		ar.Article,
 		ar.AudioLocation,
 		ar.Pronunciation,
 		ar.Example,
-		ar.Declension,
-		ar.Conjugation,
+		ar.Translations,
 		ar.Gender,
+		ar.Declension,
 		ar.GenitiveSingular,
+		ar.Conjugation,
 		ar.ForvoSearchField,
+		ar.Headword,
+		ar.Sentence,
 	}
 }
 
